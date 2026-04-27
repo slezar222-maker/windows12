@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows 12 Ultra</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* === ТЕМЫ И ПЕРЕМЕННЫЕ === */
+        :root {
+            /* Dark */
+            --bg-color: #0f0f12;
+            --taskbar-bg: rgba(20, 20, 25, 0.85);
+            --window-bg: rgba(30, 30, 35, 0.95);
+            --text-main: #ffffff;
+            --text-sec: #a0a0a0;
+            --accent: #0078d4;
+            --hover: rgba(255,255,255,0.1);
+            --border: 1px solid rgba(255,255,255,0.1);
+            --radius: 12px;
+            --shadow: 0 15px 40px rgba(0,0,0,0.5);
+            --desktop-bg: url('https://images.unsplash.com/photo-1614850523060-8da1d56e167d?q=80&w=2670&auto=format&fit=crop');
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f3f3f3;
+            --taskbar-bg: rgba(255, 255, 255, 0.85);
+            --window-bg: rgba(255, 255, 255, 0.95);
+            --text-main: #222222;
+            --text-sec: #666666;
+            --accent: #0067c0;
+            --hover: rgba(0,0,0,0.05);
+            --border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        [data-theme="blue"] {
+            --bg-color: #0b1622;
+            --window-bg: rgba(20, 30, 45, 0.95);
+            --accent: #4fc3f7;
+            --desktop-bg: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop');
+        }
+
+        [data-theme="matrix"] {
+            --bg-color: #000000;
+            --window-bg: rgba(0, 10, 0, 0.9);
+            --text-main: #00ff00;
+            --text-sec: #008800;
+            --accent: #00ff00;
+            --hover: rgba(0, 255, 0, 0.1);
+            --border: 1px solid #00ff00;
+            --desktop-bg: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2670&auto=format&fit=crop');
+        }
+
+        * { box-sizing: border-box; user-select: none; outline: none; }
+        
+        body, html {
+            margin: 0; padding: 0; width: 100vw; height: 100vh;
+            overflow: hidden; font-family: 'Segoe UI', sans-serif;
+            color: var(--text-main); background: var(--bg-color);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* АНИМАЦИИ */
+        @keyframes winOpen { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes winClose { to { transform: scale(0.9); opacity: 0; } }
+        @keyframes minimize { to { transform: scale(0) translateY(500px); opacity: 0; } }
+
+        /* РАБОЧИЙ СТОЛ */
+        #desktop {
+            width: 100%; height: calc(100vh - 48px);
+            background-image: var(--desktop-bg);
+            background-size: cover; background-position: center;
+            position: relative; padding: 20px;
+            transition: background-image 0.5s ease;
+        }
+
+        /* ИКОНКИ */
+        .icon {
+            width: 80px; height: 90px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-radius: 8px; cursor: default; transition: 0.1s;
+            position: absolute; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .icon:hover { background: var(--hover); transform: scale(1.02); }
+        .icon.selected { background: var(--hover); border: 1px solid var(--accent); }
+        .icon i { font-size: 36px; margin-bottom: 5px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+        .icon span { font-size: 12px; text-align: center; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--text-main); text-shadow: none; background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 4px; width: 100%;}
+
+        /* ОКНА */
+        .window {
+            position: absolute; background: var(--window-bg);
+            border-radius: var(--radius); box-shadow: var(--shadow);
+            border: var(--border); backdrop-filter: blur(20px);
+            display: flex; flex-direction: column; overflow: hidden;
+            animation: winOpen 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+            z-index: 100; color: var(--text-main);
+        }
+        .window.closing { animation: winClose 0.2s forwards; }
+        .window.minimizing { animation: minimize 0.4s forwards; pointer-events: none; }
+
+        .title-bar {
+            height: 36px; background: var(--hover);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 10px; cursor: default;
+        }
+        .title-drag { flex-grow: 1; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .controls { display: flex; gap: 8px; }
+        .btn { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; transition: 0.2s; }
+        .btn:hover { filter: brightness(1.2); }
+        .b-close { background: #ff5f57; }
+        .b-min { background: #febc2e; }
+        .b-max { background: #28c840; }
+
+        .content { flex-grow: 1; overflow: auto; position: relative; background: rgba(0,0,0,0.2); }
+
+        /* ПАНЕЛЬ ЗАДАЧ */
+        #taskbar {
+            position: absolute; bottom: 0; width: 100%; height: 48px;
+            background: var(--taskbar-bg); backdrop-filter: blur(20px);
+            display: flex; align-items: center; justify-content: center;
+            border-top: var(--border); z-index: 1000;
+        }
+        .tb-center { display: flex; gap: 4px; padding: 0 10px; }
+        .tb-icon {
+            width: 40px; height: 40px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; cursor: pointer; transition: 0.2s; color: var(--text-main);
+            position: relative;
+        }
+        .tb-icon:hover { background: var(--hover); transform: translateY(-2px); }
+        .tb-icon.active::after {
+            content: ''; position: absolute; bottom: 2px; width: 16px; height: 3px;
+            background: var(--accent); border-radius: 2px;
+        }
+        .tb-right { position: absolute; right: 15px; display: flex; gap: 15px; font-size: 12px; align-items: center; }
+
+        /* START MENU */
+        #start {
+            position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+            width: 500px; height: 450px; background: var(--window-bg);
+            backdrop-filter: blur(30px); border-radius: 12px;
+            border: var(--border); box-shadow: var(--shadow);
+            display: none; flex-direction: column; padding: 20px; z-index: 999;
+            animation: winOpen 0.2s;
+        }
+        .start-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 15px; }
+        .start-item { display: flex; flex-direction: column; align-items: center; padding: 10px; border-radius: 6px; cursor: pointer; }
+        .start-item:hover { background: var(--hover); }
+
+        /* === APP SPECIFIC STYLES === */
+        
+        /* YouTube App */
+        .yt-app { display: flex; flex-direction: column; height: 100%; background: #000; }
+        .yt-nav { padding: 10px; background: #1a1a1a; display: flex; gap: 10px; align-items: center; }
+        .yt-search { flex-grow: 1; background: #333; border: none; padding: 8px 15px; border-radius: 20px; color: white; }
+        .yt-viewport { flex-grow: 1; width: 100%; height: 100%; border: none; }
+
+        /* Telegram */
+        .tg-app { display: flex; height: 100%; }
+        .tg-sidebar { width: 250px; border-right: var(--border); display: flex; flex-direction: column; }
+        .tg-main { flex-grow: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.2); }
+        .tg-chat-list { flex-grow: 1; overflow-y: auto; }
+        .tg-chat-item { padding: 12px; display: flex; gap: 10px; cursor: pointer; }
+        .tg-chat-item:hover, .tg-chat-item.active { background: var(--hover); }
+        .tg-avatar { width: 40px; height: 40px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; }
+        .tg-messages { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .msg { max-width: 70%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4; }
+        .msg.out { align-self: flex-end; background: var(--accent); color: white; }
+        .msg.in { align-self: flex-start; background: var(--hover); color: var(--text-main); }
+        .tg-input-area { padding: 10px; border-top: var(--border); display: flex; gap: 10px; }
+        .tg-input-area input { flex-grow: 1; background: var(--hover); border: none; padding: 10px; border-radius: 20px; color: var(--text-main); }
+
+        /* Paint */
+        .paint-toolbar { height: 40px; background: var(--hover); display: flex; align-items: center; padding: 0 10px; gap: 10px; }
+        .paint-canvas { cursor: crosshair; background: white; width: 100%; height: calc(100% - 40px); }
+        
+        /* Calc */
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 10px; height: 100%; }
+        .calc-display { grid-column: span 4; background: rgba(0,0,0,0.3); color: var(--text-main); font-size: 24px; text-align: right; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+        .calc-btn { background: var(--hover); border: none; color: var(--text-main); border-radius: 6px; font-size: 18px; cursor: pointer; transition: 0.1s; }
+        .calc-btn:hover { filter: brightness(1.1); }
+        .calc-btn.op { background: var(--accent); color: white; }
+
+        /* Notepad */
+        .notepad-area { width: 100%; height: 100%; background: var(--window-bg); color: var(--text-main); border: none; padding: 15px; font-family: monospace; resize: none; font-size: 14px; }
+
+        /* Settings */
+        .settings-page { padding: 30px; overflow-y: auto; height: 100%; }
+        .sect { margin-bottom: 20px; background: var(--hover); padding: 20px; border-radius: 12px; border: var(--border); }
+        .theme-grid { display: flex; gap: 10px; }
+        .theme-card { width: 80px; height: 80px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; background-size: cover; background-position: center; }
+        .theme-card.active { border-color: var(--accent); }
+        
+        .wp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .wp-thumb { height: 80px; border-radius: 8px; cursor: pointer; background-size: cover; background-position: center; border: 2px solid transparent; transition: 0.2s; }
+        .wp-thumb:hover { transform: scale(1.05); }
+        .wp-thumb.active { border-color: var(--accent); }
+
+        /* Browser */
+        .browser-nav { padding: 8px; background: var(--hover); display: flex; gap: 8px; align-items: center; }
+        .url-bar { flex-grow: 1; background: rgba(0,0,0,0.2); border: none; color: var(--text-main); padding: 6px 12px; border-radius: 15px; font-size: 13px; }
+        .browser-frame { width: 100%; height: 100%; border: none; background: white; }
+        .browser-error { display: none; padding: 40px; text-align: center; color: #555; background: #f9f9f9; height: 100%; }
+
+        /* Store */
+        .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; padding: 20px; }
+        .app-card { background: var(--hover); padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; border: var(--border); transition: 0.2s; }
+        .app-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+    </style>
+</head>
+<body>
+
+    <div id="desktop"></div>
+
+    <div id="taskbar">
+        <div class="tb-center">
+            <div class="tb-icon" onclick="toggleStart()"><i class="fab fa-windows" style="color: var(--accent)"></i></div>
+            <div class="tb-icon" onclick="openApp('browser')"><i class="fas fa-globe"></i></div>
+            <div class="tb-icon" onclick="openApp('yt')"><i class="fab fa-youtube" style="color:#ff0000"></i></div>
+            <div class="tb-icon" onclick="openApp('tg')"><i class="fab fa-telegram" style="color:#2AABEE"></i></div>
+            <div class="tb-icon" onclick="openApp('store')"><i class="fas fa-shopping-bag" style="color:#ff6b6b"></i></div>
+            <div class="tb-icon" onclick="openApp('files')"><i class="fas fa-folder-open" style="color:#f7d794"></i></div>
+            <div class="tb-icon" onclick="openApp('settings')"><i class="fas fa-cog"></i></div>
+        </div>
+        <div class="tb-right">
+            <div id="clock">12:00</div>
+        </div>
+    </div>
+
+    <div id="start">
+        <input type="text" placeholder="🔍 Поиск..." style="width:100%; padding:10px; background:var(--hover); border:none; color:var(--text-main); border-radius:6px; margin-bottom:15px;">
+        <div style="font-size:12px; opacity:0.7; margin-bottom:10px;">Закреплено</div>
+        <div class="start-grid" id="start-list"></div>
+    </div>
+
+    <script>
+        // === CONFIG & STATE ===
+        const apps = {
+            browser: { name: 'Browser', icon: 'fas fa-globe' },
+            yt: { name: 'YouTube', icon: 'fab fa-youtube' },
+            tg: { name: 'Telegram', icon: 'fab fa-telegram' },
+            store: { name: 'Store', icon: 'fas fa-shopping-bag' },
+            files: { name: 'Files', icon: 'fas fa-folder-open' },
+            settings: { name: 'Settings', icon: 'fas fa-cog' },
+            trash: { name: 'Trash', icon: 'fas fa-trash' }
+        };
+
+        const storeApps = [
+            { id: 'paint', name: 'Paint', icon: 'fas fa-palette', desc: 'Рисование' },
+            { id: 'calc', name: 'Calculator', icon: 'fas fa-calculator', desc: 'Математика' },
+            { id: 'notepad', name: 'Notepad', icon: 'fas fa-sticky-note', desc: 'Заметки' },
+            { id: 'vscode', name: 'VS Code', icon: 'fas fa-code', desc: 'Редактор' },
+            { id: 'discord', name: 'Discord', icon: 'fab fa-discord', desc: 'Чат' }
+        ];
+
+        let state = {
+            windows: {},
+            zIndex: 100,
+            icons: [
+                { id: 'i1', app: 'browser', x: 20, y: 20 },
+                { id: 'i2', app: 'yt', x: 20, y: 120 },
+                { id: 'i3', app: 'tg', x: 20, y: 220 },
+                { id: 'i4', app: 'store', x: 20, y: 320 },
+                { id: 'i5', app: 'files', x: 20, y: 420 },
+                { id: 'i6', app: 'settings', x: 20, y: 520 }
+            ],
+            installed: [],
+            theme: 'dark'
+        };
+
+        const desktop = document.getElementById('desktop');
+        const taskbar = document.getElementById('taskbar');
+        const startMenu = document.getElementById('start');
+
+        // === INIT ===
+        function init() {
+            renderIcons();
+            renderStart();
+            setInterval(updateClock, 1000);
+            updateClock();
+            applyTheme(state.theme);
+
+            document.addEventListener('click', (e) => {
+                if(e.target === desktop) {
+                    document.querySelectorAll('.icon').forEach(i => i.classList.remove('selected'));
+                    startMenu.style.display = 'none';
+                }
+            });
+        }
+
+        // === ICON DRAG ===
+        function renderIcons() {
+            desktop.innerHTML = '';
+            state.icons.forEach(item => {
+                const info = apps[item.app] || storeApps.find(s=>s.id===item.app) || {name:'File', icon:'fas fa-file'};
+                const el = document.createElement('div');
+                el.className = 'icon';
+                el.id = item.id;
+                el.style.left = item.x + 'px';
+                el.style.top = item.y + 'px';
+                el.innerHTML = `<i class="${info.icon}"></i><span>${info.name}</span>`;
+                
+                el.ondblclick = () => openApp(item.app);
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.icon').forEach(i => i.classList.remove('selected'));
+                    el.classList.add('selected');
+                };
+                makeDraggable(el);
+                desktop.appendChild(el);
+            });
+        }
+
+        function makeDraggable(el) {
+            let isDragging = false;
+            let startX, startY, initLeft, initTop;
+
+            el.onmousedown = (e) => {
+                if(e.button !== 0) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initLeft = el.offsetLeft;
+                initTop = el.offsetTop;
+                el.style.zIndex = 999;
+            };
+
+            window.onmousemove = (e) => {
+                if(!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                el.style.left = (initLeft + dx) + 'px';
+                el.style.top = (initTop + dy) + 'px';
+            };
+
+            window.onmouseup = () => {
+                if(!isDragging) return;
+                isDragging = false;
+                el.style.zIndex = '';
+                
+                let nx = Math.round(el.offsetLeft / 40) * 40;
+                let ny = Math.round(el.offsetTop / 40) * 40;
+                
+                let collision = state.icons.some(o => o.id !== el.id && o.x === nx && o.y === ny);
+
+                if(collision) {
+                    el.style.left = initLeft + 'px';
+                    el.style.top = initTop + 'px';
+                } else {
+                    el.style.left = nx + 'px';
+                    el.style.top = ny + 'px';
+                    const item = state.icons.find(i => i.id === el.id);
+                    if(item) { item.x = nx; item.y = ny; }
+                }
+            };
+        }
+
+        // === WINDOW MANAGER ===
+        function openApp(appId) {
+            const winId = 'win-' + appId;
+            if(document.getElementById(winId)) {
+                const win = document.getElementById(winId);
+                if(win.style.display === 'none') {
+                    win.style.display = 'flex';
+                    win.classList.remove('minimizing');
+                }
+                focusWindow(winId);
+                return;
+            }
+
+            const info = apps[appId] || storeApps.find(s=>s.id===appId) || {name:'App', icon:'fas fa-cube'};
+            
+            const win = document.createElement('div');
+            win.id = winId;
+            win.className = 'window';
+            win.style.zIndex = ++state.zIndex;
+            win.style.left = (50 + Math.random()*50) + 'px';
+            win.style.top = (50 + Math.random()*50) + 'px';
+            win.style.width = appId==='yt'?'1000px':(appId==='tg'?'900px':(appId==='browser'?'900px':'600px'));
+            win.style.height = appId==='yt'?'700px':(appId==='tg'?'600px':'500px');
+
+            let content = '';
+            if(appId === 'browser') content = getBrowserHTML();
+            else if(appId === 'yt') content = getYouTubeHTML();
+            else if(appId === 'tg') content = getTelegramHTML();
+            else if(appId === 'store') content = getStoreHTML();
+            else if(appId === 'settings') content = getSettingsHTML();
+            else if(appId === 'paint') content = getPaintHTML();
+            else if(appId === 'calc') content = getCalcHTML();
+            else if(appId === 'notepad') content = getNotepadHTML();
+            else content = `<div style="padding:20px; text-align:center"><h1>${info.name}</h1><p>Работает...</p></div>`;
+
+            win.innerHTML = `
+                <div class="title-bar" onmousedown="startDrag(event, '${winId}')">
+                    <div class="title-drag"><i class="${info.icon}"></i> ${info.name}</div>
+                    <div class="controls">
+                        <div class="btn b-min" onclick="minWin('${winId}')"></div>
+                        <div class="btn b-max" onclick="maxWin('${winId}')"></div>
+                        <div class="btn b-close" onclick="closeWin('${winId}')"></div>
+                    </div>
+                </div>
+                <div class="content">${content}</div>
+            `;
+
+            win.onmousedown = () => focusWindow(winId);
+            desktop.appendChild(win);
+            updateTaskbar(appId, true);
+            startMenu.style.display = 'none';
+        }
+
+        function closeWin(id) {
+            const win = document.getElementById(id);
+            win.classList.add('closing');
+            setTimeout(() => {
+                win.remove();
+                const appId = id.replace('win-', '');
+                updateTaskbar(appId, false);
+            }, 200);
+        }
+
+        function minWin(id) {
+            const win = document.getElementById(id);
+            win.classList.add('minimizing');
+            setTimeout(() => {
+                win.style.display = 'none';
+                win.classList.remove('minimizing');
+                win.style.transform = ''; 
+            }, 400);
+        }
+
+        function focusWindow(id) {
+            const win = document.getElementById(id);
+            if(win) win.style.zIndex = ++state.zIndex;
+        }
+
+        function startDrag(e, id) {
+            if(e.target.closest('.controls')) return;
+            const win = document.getElementById(id);
+            if(win.dataset.max) return;
+            let sx = e.clientX, sy = e.clientY;
+            let sl = win.offsetLeft, st = win.offsetTop;
+            const move = (ev) => {
+                win.style.left = (sl + (ev.clientX - sx)) + 'px';
+                win.style.top = (st + (ev.clientY - sy)) + 'px';
+            };
+            const stop = () => {
+                window.removeEventListener('mousemove', move);
+                window.removeEventListener('mouseup', stop);
+            };
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', stop);
+        }
+
+        // === APPS LOGIC ===
+
+        /* 1. YOUTUBE (REAL EMBED) */
+        function getYouTubeHTML() {
+            // Используем YouTube Embed с поиском плейлиста. Это позволяет смотреть видео внутри окна.
+            return `
+            <div class="yt-app">
+                <div class="yt-nav">
+                    <i class="fab fa-youtube" style="color:#ff0000; font-size:24px;"></i>
+                    <input type="text" class="yt-search" placeholder="Поиск видео..." onkeydown="if(event.key==='Enter') ytSearch(this)">
+                    <button onclick="ytSearch(this.previousElementSibling)" style="background:var(--accent); border:none; color:white; padding:8px 15px; border-radius:20px; cursor:pointer">Найти</button>
+                </div>
+                <iframe id="yt-frame" class="yt-viewport" src="https://www.youtube.com/embed/?listType=search&list=music" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+            </div>`;
+        }
+
+        function ytSearch(input) {
+            const query = input.value;
+            if(!query) return;
+            const frame = document.getElementById('yt-frame');
+            // Магия YouTube: listType=search&list=QUERY загружает результаты поиска как плейлист
+            frame.src = `https://www.youtube.com/embed/?listType=search&list=${encodeURIComponent(query)}`;
+        }
+
+        /* 2. BROWSER */
+        function getBrowserHTML() {
+            return `
+            <div style="display:flex; flex-direction:column; height:100%;">
+                <div class="browser-nav">
+                    <button onclick="loadUrl('https://www.wikipedia.org')" style="background:none; border:none; color:inherit; cursor:pointer"><i class="fas fa-home"></i></button>
+                    <input type="text" class="url-bar" value="https://www.wikipedia.org" onkeydown="if(event.key==='Enter') browserNav(this)">
+                    <button onclick="browserNav(this.previousElementSibling)" style="background:none; border:none; color:inherit; cursor:pointer"><i class="fas fa-arrow-right"></i></button>
+                    <button onclick="browserNewTab(this.previousElementSibling.previousElementSibling)" class="new-tab-btn" style="background:var(--accent); border:none; color:white; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:12px;">↗ New Tab</button>
+                </div>
+                <div style="flex-grow:1; position:relative; background:white;">
+                    <iframe id="b-frame" class="browser-frame" src="https://www.wikipedia.org" style="pointer-events:auto;"></iframe>
+                </div>
+            </div>`;
+        }
+
+        function browserNav(input) {
+            let url = input.value;
+            if(!url.startsWith('http')) url = 'https://' + url;
+            // YouTube Converter
+            if(url.includes('youtube.com/watch?v=')) {
+                const vId = url.split('v=')[1].split('&')[0];
+                url = `https://www.youtube.com/embed/${vId}`;
+            }
+            document.getElementById('b-frame').src = url;
+        }
+        function browserNewTab(input) { window.open(input.value, '_blank'); }
+
+        /* 3. TELEGRAM */
+        function getTelegramHTML() {
+            return `
+            <div class="tg-app">
+                <div class="tg-sidebar">
+                    <div class="tg-chat-list">
+                        <div class="tg-chat-item active">
+                            <div class="tg-avatar">S</div>
+                            <div>
+                                <div style="font-weight:bold">Избранное</div>
+                                <div style="font-size:12px; opacity:0.7">Напиши сообщение...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tg-main">
+                    <div class="title-bar" style="height:auto; padding:10px;"><b>Избранное</b></div>
+                    <div class="tg-messages" id="tg-msgs">
+                        <div class="msg in">Привет! Это симулятор Telegram Web.</div>
+                    </div>
+                    <div class="tg-input-area">
+                        <input type="text" id="tg-input" placeholder="Сообщение..." onkeydown="if(event.key==='Enter') sendTgMsg()">
+                        <button onclick="sendTgMsg()" style="background:var(--accent); border:none; color:white; border-radius:50%; width:40px; height:40px; cursor:pointer"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function sendTgMsg() {
+            const inp = document.getElementById('tg-input');
+            const list = document.getElementById('tg-msgs');
+            if(!inp.value.trim()) return;
+            list.innerHTML += `<div class="msg out">${inp.value}</div>`;
+            list.scrollTop = list.scrollHeight;
+            inp.value = '';
+            setTimeout(() => {
+                list.innerHTML += `<div class="msg in">Автоответ: Получено "${inp.value || 'сообщение'}"!</div>`;
+                list.scrollTop = list.scrollHeight;
+            }, 800);
+        }
+
+        /* 4. PAINT */
+        function getPaintHTML() {
+            return `
+            <div style="height:100%; display:flex; flex-direction:column;">
+                <div class="paint-toolbar">
+                    <input type="color" id="p-color" value="#000000" style="width:30px; height:30px; border:none; background:none; cursor:pointer;">
+                    <input type="range" id="p-size" min="1" max="20" value="5">
+                    <button onclick="clearCanvas()" style="border:none; background:var(--hover); color:inherit; padding:5px 10px; border-radius:4px; cursor:pointer">Очистить</button>
+                </div>
+                <canvas id="paint-canvas" class="paint-canvas"></canvas>
+            </div>`;
+        }
+        function initPaint() {
+            const cvs = document.getElementById('paint-canvas');
+            if(!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const rect = cvs.parentElement.getBoundingClientRect();
+            cvs.width = rect.width;
+            cvs.height = rect.height - 40;
+            let painting = false;
+            function startPosition(e) { painting = true; draw(e); }
+            function endPosition() { painting = false; ctx.beginPath(); }
+            function draw(e) {
+                if(!painting) return;
+                const r = cvs.getBoundingClientRect();
+                ctx.lineWidth = document.getElementById('p-size').value;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = document.getElementById('p-color').value;
+                ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+            }
+            cvs.addEventListener('mousedown', startPosition);
+            cvs.addEventListener('mouseup', endPosition);
+            cvs.addEventListener('mousemove', draw);
+        }
+        function clearCanvas() {
+            const c = document.getElementById('paint-canvas');
+            if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+        }
+
+        /* 5. CALC */
+        function getCalcHTML() {
+            const btns = ['C','/','*','-','7','8','9','+','4','5','6','=','1','2','3','0'];
+            return `
+            <div class="calc-grid">
+                <div class="calc-display" id="c-disp">0</div>
+                ${btns.map(b => `<button class="calc-btn ${['/','*','-','+'].includes(b)?'op':''}" onclick="calc('${b}')">${b}</button>`).join('')}
+            </div>`;
+        }
+        let calcVal = '0';
+        function calc(b) {
+            const d = document.getElementById('c-disp');
+            if(b === 'C') { calcVal = '0'; }
+            else if(b === '=') { try { calcVal = eval(calcVal).toString(); } catch { calcVal = 'Error'; } }
+            else { if(calcVal === '0') calcVal = b; else calcVal += b; }
+            d.innerText = calcVal;
+        }
+
+        /* 6. NOTEPAD */
+        function getNotepadHTML() {
+            return `<textarea class="notepad-area" placeholder="Введите текст..."></textarea>`;
+        }
+
+        /* 7. SETTINGS & WALLPAPERS FIX */
+        function getSettingsHTML() {
+            const themes = [
+                { id: 'dark', bg: '#1a1a1a', name: 'Dark' },
+                { id: 'light', bg: '#f0f0f0', name: 'Light' },
+                { id: 'blue', bg: '#0b1622', name: 'Blue' },
+                { id: 'matrix', bg: '#000000', name: 'Matrix' }
+            ];
+            
+            // Фикс: Прямые ссылки на обои в onclick
+            const wps = [
+                'https://images.unsplash.com/photo-1614850523060-8da1d56e167d?q=80&w=2670&auto=format&fit=crop',
+                'https://images.unsplash.com/photo-1477346611705-65d1883cee1e?q=80&w=2070&auto=format&fit=crop',
+                'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop',
+                'https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?q=80&w=2544&auto=format&fit=crop',
+                'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2572&auto=format&fit=crop',
+                'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'
+            ];
+
+            return `
+            <div class="settings-page">
+                <h2>Параметры</h2>
+                <div class="sect">
+                    <h3>Темы</h3>
+                    <div class="theme-grid">
+                        ${themes.map(t => `<div class="theme-card ${state.theme===t.id?'active':''}" style="background:${t.bg}; border:1px solid #555" onclick="applyTheme('${t.id}')"><div style="color:${t.id==='light'?'black':'white'}; text-align:center; margin-top:25px;">${t.name}</div></div>`).join('')}
+                    </div>
+                </div>
+                <div class="sect">
+                    <h3>Обои</h3>
+                    <div class="wp-grid">
+                        ${wps.map(url => `<div class="wp-thumb" style="background-image:url('${url}')" onclick="setWallpaper('${url}', this)"></div>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function setWallpaper(url, el) {
+            document.documentElement.style.setProperty('--desktop-bg', `url('${url}')`);
+            document.querySelectorAll('.wp-thumb').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function applyTheme(themeId) {
+            state.theme = themeId;
+            document.documentElement.setAttribute('data-theme', themeId);
+        }
+
+        /* 8. STORE */
+        function getStoreHTML() {
+            return `
+            <div class="store-grid">
+                ${storeApps.map(app => `
+                    <div class="app-card" onclick="installApp('${app.id}')">
+                        <i class="${app.icon}" style="font-size:32px; margin-bottom:10px;"></i>
+                        <b>${app.name}</b>
+                        <div style="font-size:12px; opacity:0.7">${app.desc}</div>
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+
+        function installApp(id) {
+            if(state.installed.includes(id)) { openApp(id); return; }
+            state.installed.push(id);
+            alert('Установка ' + id + ' завершена!');
+            state.icons.push({ id: 'i'+Date.now(), app: id, x: 120, y: 50 });
+            renderIcons();
+        }
+
+        // === UTILS ===
+        function updateClock() {
+            const d = new Date();
+            document.getElementById('clock').innerHTML = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        function toggleStart() {
+            startMenu.style.display = startMenu.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function renderStart() {
+            const list = document.getElementById('start-list');
+            const all = Object.values(apps);
+            list.innerHTML = all.map(a => `
+                <div class="start-item" onclick="openApp('${Object.keys(apps).find(k=>apps[k]===a)}')">
+                    <i class="${a.icon}" style="font-size:24px; margin-bottom:5px;"></i>
+                    <span>${a.name}</span>
+                </div>
+            `).join('');
+        }
+
+        const originalOpen = openApp;
+        openApp = function(id) {
+            originalOpen(id);
+            if(id === 'paint') setTimeout(initPaint, 100);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
